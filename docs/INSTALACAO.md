@@ -66,11 +66,17 @@ PlaylistsPath = '_playlists'
 
 O servidor grava os `.m3u` em `music/_playlists/` e chama a varredura sozinho.
 
-## 6. Primeiro administrador
+## 6. App no celular
 
-Abra o app no celular (veja `APP.md`). Na primeira vez o app mostra
-**"Primeiro acesso"**: nome, e-mail e a **senha do servidor** (o `token`). Pronto:
-você é o administrador.
+Baixe o APK pronto: `https://github.com/wesleyaviz873-lab/eko-play/releases/latest/download/eko.apk`
+e copie para `server/apk/eko.apk` (assim a página `/instalar` do seu servidor
+também serve o app). No celular, instale e entre com **usuário e senha** do
+Navidrome — veja `APP.md`.
+
+## 7. Primeiro administrador
+
+Se o app mostrar **"Primeiro acesso"**: nome, e-mail e a **senha do servidor**
+(o `token` do `config.json`). Pronto: você é o administrador.
 
 Depois disso, em **Ajustes → Administração**:
 
@@ -79,7 +85,7 @@ Depois disso, em **Ajustes → Administração**:
 - **Compartilhar o EKO**: manda o link de instalação.
 - **Login do YouTube**: necessário só para baixar playlists privadas.
 
-## 7. Atualizações
+## 8. Atualizações
 
 O app avisa quando há versão nova (compara com `apk/versao.json`). Para publicar
 uma versão: gere o APK e copie para `apk/eko.apk`, atualizando o `versao.json`.

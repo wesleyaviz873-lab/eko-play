@@ -48,8 +48,10 @@ pelo Navidrome e administra quem tem acesso.
    Passo a passo em [docs/INSTALACAO.md](docs/INSTALACAO.md).
 2. **Primeiro administrador** — abra o app e use a tela "Primeiro acesso" com a
    senha definida em `config.json`.
-3. **Celular** — instale em `/instalar` do seu servidor (ou compile, em
-   [docs/APP.md](docs/APP.md)).
+3. **Celular** — baixe o APK pronto em
+   [Releases](https://github.com/wesleyaviz873-lab/eko-play/releases/latest) e entre
+   com usuário/senha do Navidrome. Sem Android Studio nem adb
+   ([docs/APP.md](docs/APP.md)).
 4. **Fora de casa** (opcional) — Cloudflare Tunnel, ngrok ou só na rede local:
    [docs/TUNEL.md](docs/TUNEL.md).
 
