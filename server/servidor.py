@@ -118,13 +118,23 @@ def carregar_fila():
 
 
 def salvar_fila():
-    FILA_PATH.parent.mkdir(parents=True, exist_ok=True)
-    FILA_PATH.write_text(json.dumps(_fila[-300:], ensure_ascii=False, indent=1), encoding="utf-8")
+    _gravar_json(FILA_PATH, _fila[-300:])
 
 
 def novidades():
     with _trava:
         return [dict(j) for j in reversed(_fila)]
+
+
+def _gravar_json(caminho, obj):
+    """Grava JSON de forma segura: arquivo temporario + replace atomico."""
+    try:
+        caminho.parent.mkdir(parents=True, exist_ok=True)
+        temp = caminho.with_suffix(caminho.suffix + ".tmp")
+        temp.write_text(json.dumps(obj, ensure_ascii=False, indent=1), encoding="utf-8")
+        os.replace(temp, caminho)
+    except OSError as erro:
+        print(f" EKO: falha ao gravar {caminho.name}: {erro}")
 
 
 def _hash(texto):
@@ -158,10 +168,7 @@ def _carregar_dispositivos():
 
 
 def _salvar_dispositivos():
-    DISPOSITIVOS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    DISPOSITIVOS_PATH.write_text(
-        json.dumps(_dispositivos, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+    _gravar_json(DISPOSITIVOS_PATH, _dispositivos)
 
 
 _dispositivos = _carregar_dispositivos()
@@ -179,10 +186,7 @@ def _carregar_pessoas():
 
 
 def _salvar_pessoas():
-    PESSOAS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PESSOAS_PATH.write_text(
-        json.dumps(_pessoas, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+    _gravar_json(PESSOAS_PATH, _pessoas)
 
 
 _pessoas = _carregar_pessoas()
