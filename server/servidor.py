@@ -2064,6 +2064,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(429, {"erro": "muitas requisicoes; espere um pouco"})
         partes = urlparse(self.path)
         rota, query = partes.path, parse_qs(partes.query)
+        if rota in ("/apk", "/apk/"):
+            extra = ""
+            return self._responder(
+                200, _pagina_instalar(), "text/html; charset=utf-8"
+            )
         if rota in ("/instalar", "/instalar/"):
             extra = ""
             if (APK_DIR / "player.apk").is_file():
