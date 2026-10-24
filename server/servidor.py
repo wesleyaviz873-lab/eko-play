@@ -1755,14 +1755,8 @@ a.btn.alt{background:#23262d;color:#c9ccd4}
 <div class="card">
   <div class="logo">♪</div>
   <h1>EKO</h1>
-  <p>a música da família, num lugar só</p>
-  <a class="btn" href="/apk/eko.apk">Baixar o EKO</a>
+  <a class="btn" href="/apk/eko.apk">Baixar</a>
   {{PLAYER}}
-  <ol class="passo">
-    <li>Instale o app (o Chrome pode pedir “Baixar mesmo assim”).</li>
-    <li>Abra e toque em <b>Pedir acesso</b>, com seu nome.</li>
-    <li>O dono aprova e você entra.</li>
-  </ol>
 </div>
 </body></html>
 """
@@ -2338,6 +2332,13 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(429, {"erro": "muitas requisicoes; espere um pouco"})
         partes = urlparse(self.path)
         rota, query = partes.path, parse_qs(partes.query)
+        if rota in ("/instalar", "/instalar/"):
+            extra = ""
+            if (APK_DIR / "player.apk").is_file():
+                extra = '<a class="btn alt" href="/apk/player.apk">Baixar o player</a>'
+            return self._responder(
+                200, PAGINA_INICIO.replace("{{PLAYER}}", extra), "text/html; charset=utf-8"
+            )
         if rota in ("/", "/index.html"):
             extra = ""
             if (APK_DIR / "player.apk").is_file():
