@@ -1,64 +1,96 @@
-# EKO — música da família, num lugar só
+# EKO
 
-Servidor de música **privado** para a sua casa: baixa músicas do YouTube para o seu
-computador, organiza sozinho (sem duplicatas) e deixa todo mundo ouvir no celular,
-com um app Android próprio.
+Servidor de música caseiro com app Android próprio: baixa do YouTube para o seu
+computador, organiza a biblioteca e toca no celular de quem você autorizar.
 
-Não é um serviço na nuvem: **roda na sua máquina**. Nada de assinatura, nada de
-anúncio, e ninguém entra sem a sua autorização.
+Roda na sua máquina. Não é nuvem, não tem assinatura, não tem anúncio.
+
+---
+
+## Como funciona
 
 ```
- celular (app EKO)                    seu computador
-┌───────────────────┐   HTTPS   ┌────────────────────────────┐
-│ navegador YouTube │ ────────► │ motor (servidor.py)        │
-│ botão Baixar      │           │  ├─ yt-dlp (baixa)         │
-│ player + downloads│ ◄──────── │  ├─ dedupe + catálogo      │
-└───────────────────┘  streaming│  └─ Navidrome (acervo)     │
-                                │       └─ music/  (2+ GB)   │
-                                └────────────────────────────┘
+celular (EKO)                          seu computador
+┌────────────────────┐    HTTPS    ┌──────────────────────────┐
+│ navegador YouTube  │ ──────────► │ servidor.py (API + fila) │
+│ botão Baixar       │             │   ├─ yt-dlp (download)   │
+│ player + downloads │ ◄────────── │   ├─ dedupe / catálogo   │
+└────────────────────┘  streaming  │   └─ Navidrome (acervo)  │
+                                   │        └─ music/         │
+                                   └──────────────────────────┘
 ```
 
-## O que ele faz
+O app é um navegador restrito ao YouTube com um botão de baixar. O servidor recebe
+o link, baixa, evita duplicata e indexa no Navidrome. O mesmo app toca a biblioteca
+pelo Navidrome e administra quem tem acesso.
 
-- **Baixar música** (ou vídeo) direto do celular, pelo navegador do app.
-- **Playlist inteira** de uma vez — e ela vira uma playlist de verdade no app.
-- **Nunca baixa duas vezes**: trava por ID do vídeo + impressão digital do áudio.
-- **Acervo organizado**: `Artista/Álbum/faixa.mp3` com capa e metadados.
-- **Playlists automáticas**: tudo que a pessoa baixou aparece em
-  `Baixadas - <nome>` (um `.m3u` que o Navidrome importa).
-- **Administração no app**: aprovar quem entra, promover outro admin, remover.
-- **Dois jeitos de entrar**: conta Google (recomendado) ou cadastro + aprovação.
+## Recursos
 
-## Segurança (o que garante que só a sua família usa)
+- **Baixar música ou vídeo** direto do celular.
+- **Playlist inteira** de uma vez; as faixas já existentes entram na playlist sem
+  serem baixadas de novo.
+- **Dedupe em três níveis**: ID do vídeo, metadados (±4 s) e impressão digital
+  de áudio (Chromaprint).
+- **Playlists automáticas**: `Baixadas - <nome>` por pessoa e `Nome da playlist`
+  por lista baixada.
+- **Administração no app**: aprovar entrada, promover/remover administrador.
+- **Login com Google** ou entrada por aprovação, com HTTPS e chaves por aparelho.
 
-- Cada aparelho recebe uma **chave aleatória de 256 bits**; o servidor guarda só o hash.
-- Quem entra pela primeira vez fica **pendente** até você aprovar no app.
-- Lista de e-mails autorizados, remoção de aparelho, proteção do último admin.
-- Limite de tentativas, bloqueio por IP, HTTPS e cabeçalhos de segurança.
-- Nada de anúncio, telemetria ou analytics. O app só fala com **o seu** servidor.
+## Instalação
 
-## Começando
+1. **Computador** — Python 3.11+, ffmpeg, fpcalc e Navidrome.
+   Passo a passo em [docs/INSTALACAO.md](docs/INSTALACAO.md).
+2. **Primeiro administrador** — abra o app e use a tela "Primeiro acesso" com a
+   senha definida em `config.json`.
+3. **Celular** — instale em `/instalar` do seu servidor (ou compile, em
+   [docs/APP.md](docs/APP.md)).
+4. **Fora de casa** (opcional) — Cloudflare Tunnel, ngrok ou só na rede local:
+   [docs/TUNEL.md](docs/TUNEL.md).
 
-- [Instalação no computador](docs/INSTALACAO.md) (Windows ou Linux)
-- [App no celular](docs/APP.md)
-- [Segurança e autenticação](docs/SEGURANCA.md)
-- [Acesso de fora de casa (ngrok / Cloudflare / só local)](docs/TUNEL.md)
-- [Instalar conversando com uma IA](docs/PROMPT-IA.md)
+Prefere instalar conversando com uma IA? Use o roteiro em
+[docs/PROMPT-IA.md](docs/PROMPT-IA.md).
+
+## Segurança
+
+Acesso só para quem o dono liberar. Cada aparelho recebe uma chave aleatória de
+256 bits (guardada como hash), há limite de tentativas, bloqueio temporário e o
+servidor valida o token do Google antes de criar a sessão. Detalhes e o modelo de
+papéis em [docs/SEGURANCA.md](docs/SEGURANCA.md).
 
 ## Estrutura
 
 ```
-server/    servidor.py (API + fila + auth) e garimpar.py (motor de download)
-app/       app Android (Kotlin + Compose): navegador, download e player
-docs/      instalação, segurança, túnel, prompt para IA
+server/   API, fila de downloads e motor (Python)
+app/      app Android (Kotlin + Compose + Media3)
+docs/     instalação, app, segurança, túnel e prompt para IA
 ```
 
-## Aviso
+## Desenvolvimento
 
-Baixar conteúdo do YouTube pode contrariar os Termos de Uso do serviço. Use apenas
-com conteúdo que você tem direito de baixar (a sua própria biblioteca, domínio
-público ou licenças permissivas). O projeto não hospeda nem distribui mídia.
+Servidor:
+
+```bash
+cd server
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python servidor.py
+```
+
+App:
+
+```bash
+cd app
+./gradlew assembleDebug
+```
+
+## Status
+
+Uso pessoal e familiar, em evolução. Ideias na lista: capas e nomes vindos de
+metadados mais ricos, suporte a filmes, e um instalador guiado.
 
 ## Licença
 
-MIT — veja [LICENSE](LICENSE).
+MIT. Veja [LICENSE](LICENSE).
+
+> Baixar conteúdo do YouTube pode contrariar os Termos de Uso do serviço. Use com
+> conteúdo que você tem direito de baixar. O projeto não hospeda nem distribui
+> mídia.
