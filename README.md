@@ -5,9 +5,9 @@ computador, organiza a biblioteca e toca no celular de quem você autorizar.
 
 Roda na sua máquina. Não é nuvem, não tem assinatura, não tem anúncio.
 
-| Início | Baixar | Administração |
-|---|---|---|
-| <img src="docs/screenshots/01-inicio.jpg" width="230"> | <img src="docs/screenshots/04-download.jpg" width="230"> | <img src="docs/screenshots/06-gerenciar.jpg" width="230"> |
+| Início | Tocando | Baixar | Administração |
+|---|---|---|---|
+| <img src="docs/screenshots/01-inicio.jpg" width="190"> | <img src="docs/screenshots/02-tocando.jpg" width="190"> | <img src="docs/screenshots/04-download.jpg" width="190"> | <img src="docs/screenshots/06-gerenciar.jpg" width="190"> |
 
 ---
 
