@@ -1,0 +1,102 @@
+<div align="center">
+
+<img src="docs/icon.png" width="128" alt="Resonance icon" />
+
+# Resonance
+
+An open-source Android client for [Navidrome](https://www.navidrome.org/) and other [Subsonic](http://www.subsonic.org/)-compatible music servers.
+
+[![Build](https://github.com/AlanHuang99/resonance/actions/workflows/build.yml/badge.svg)](https://github.com/AlanHuang99/resonance/actions/workflows/build.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![Latest release](https://img.shields.io/github/v/release/AlanHuang99/resonance)](https://github.com/AlanHuang99/resonance/releases/latest)
+
+[<img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" alt="Get it on F-Droid" height="70">](https://f-droid.org/packages/com.resonance.music/)
+
+</div>
+
+## Screenshots
+
+<div align="center">
+<img src="docs/screenshots/home.png" width="30%" alt="Home" />
+&nbsp;
+<img src="docs/screenshots/player.png" width="30%" alt="Now playing" />
+&nbsp;
+<img src="docs/screenshots/settings.png" width="30%" alt="Settings" />
+</div>
+
+## Features
+
+- Stream your library from any Subsonic or Navidrome server
+- Browse by artist, album, and genre, and search across the library
+- Playback controls: play, pause, skip, seek, shuffle, and repeat
+- An editable play queue: play next, add to queue, reorder, and swipe to remove
+- Download individual songs in their original format to `Music/Resonance/Artist/Album`
+- Background playback with media-session and notification controls
+- Mini-player plus a full-screen player with swipe gestures
+- Favorites: star artists, albums, and songs
+- Artist pages with albums and tracks, play and shuffle, a biography, and similar artists
+- Tap an artist or album name to jump straight to it
+- Synced and plain-text lyrics with auto-scroll
+- Scrobbling: report played tracks back to the server
+- Several color themes
+- No ads and no tracking; the only account is your own server
+
+## Downloads
+
+Open a song's three-dot menu and tap **Download**. Android handles the transfer and shows its progress and completion in notifications. Files are saved under `Music/Resonance/Artist/Album`, with track numbers and a short identifier in each filename to keep different songs separate. Repeated taps reuse an active or completed download.
+
+Saved files can be opened in a local music player or file manager. Resonance still streams playback from your server; this option does not add an offline library or automatic syncing. Your server account must allow downloads.
+
+## Requirements
+
+- A Subsonic-compatible server, such as [Navidrome](https://www.navidrome.org/)
+- Android 12 (API 31) or newer
+
+## Install
+
+- **F-Droid:** install from [f-droid.org/packages/com.resonance.music](https://f-droid.org/packages/com.resonance.music/).
+- **GitHub:** download the latest `resonance-v<version>.apk` from the [Releases page](https://github.com/AlanHuang99/resonance/releases/latest).
+
+## Build from source
+
+You need:
+
+- JDK 17
+- The Android SDK with platform API 34 and build-tools (installing [Android Studio](https://developer.android.com/studio) is the simplest way to get these)
+
+Then:
+
+```bash
+git clone https://github.com/AlanHuang99/resonance.git
+cd resonance
+./gradlew assembleDebug
+```
+
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. To build and install straight to a connected device, use `./gradlew installDebug` instead.
+
+`./gradlew assembleRelease` produces a release APK and works without any signing secrets; the result is unsigned unless signing material is provided. See [docs/RELEASE.md](docs/RELEASE.md) for the release and F-Droid workflow.
+
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| UI | Jetpack Compose, Material 3 |
+| Architecture | MVVM, Hilt |
+| Playback | Media3 / ExoPlayer |
+| Networking | Retrofit, OkHttp, Gson |
+| Images | Coil |
+| Preferences | DataStore |
+| Async | Kotlin Coroutines and Flow |
+
+## Server compatibility
+
+- [Navidrome](https://www.navidrome.org/)
+- Any server implementing the [Subsonic API](http://www.subsonic.org/pages/api.jsp)
+
+## Contributing
+
+Issues and pull requests are welcome. For anything substantial, please open an issue first so we can discuss the approach.
+
+## License
+
+Resonance is licensed under the GNU General Public License v3.0. See the [LICENSE](LICENSE) file for the full text.

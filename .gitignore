@@ -1,0 +1,33 @@
+# Segredos e dados locais — NUNCA versionar
+config.json
+cookies.txt
+cookies.tmp.*.txt
+state/
+music/
+videos/
+logs/
+inbox/
+apk/
+bin/
+.venv/
+__pycache__/
+
+# Android
+local.properties
+keystore.properties
+*.jks
+*.keystore
+app/build/
+app/.gradle/
+app/.idea/
+app/.kotlin/
+**/build/
+**/.gradle/
+**/.kotlin/
+*.apk
+*.aab
+*.iml
+
+# Sistema
+.DS_Store
+Thumbs.db

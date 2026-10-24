@@ -1,0 +1,10 @@
+## Copie este arquivo para local.properties e ajuste.
+## (local.properties não vai para o Git.)
+
+sdk.dir=/caminho/para/Android/Sdk
+
+# Endereço do SEU servidor EKO (https de preferência)
+EKO_SERVER_URL=https://eko.seudominio.com
+
+# Opcional: Web Client ID do seu projeto no Google Cloud (login com Google)
+GOOGLE_WEB_CLIENT_ID=
