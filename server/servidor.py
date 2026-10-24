@@ -33,7 +33,6 @@ TOKEN = os.environ.get("GARIMPO_TOKEN") or CFG.get("token", "")
 FILA_PATH = g.caminho(CFG, "state_dir") / "fila.json"
 LOG_DIR = g.caminho(CFG, "log_dir")
 DISPOSITIVOS_PATH = g.caminho(CFG, "state_dir") / "dispositivos.json"
-CONVITES_PATH = g.caminho(CFG, "state_dir") / "convites.json"
 PESSOAS_PATH = g.caminho(CFG, "state_dir") / "pessoas.json"
 APK_DIR = ROOT / "apk"
 GOOGLE_CLIENT_ID = str(CFG.get("google_client_id") or "")
@@ -169,22 +168,6 @@ _dispositivos = _carregar_dispositivos()
 _salvar_dispositivos()
 
 
-def _carregar_convites():
-    try:
-        dados = json.loads(CONVITES_PATH.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-    return [c for c in dados if isinstance(c, dict) and c.get("hash")]
-
-
-def _salvar_convites():
-    CONVITES_PATH.parent.mkdir(parents=True, exist_ok=True)
-    CONVITES_PATH.write_text(
-        json.dumps(_convites, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
-
-
-_convites = _carregar_convites()
 
 
 def _carregar_pessoas():
@@ -646,51 +629,6 @@ def _remover_autorizado(email):
         return
     lista = [x for x in autorizados() if x != email]
     _salvar_autorizados(lista)
-
-
-def novo_convite(nome):
-    token = secrets.token_urlsafe(32)
-    with _trava:
-        _convites.append({
-            "hash": _hash(token),
-            "nome": (nome or "convidado")[:40],
-            "criado": datetime.now().isoformat(timespec="seconds"),
-            "usado": "",
-        })
-        _salvar_convites()
-    return token
-
-
-def _criar_dispositivo(nome, email=""):
-    segredo = secrets.token_urlsafe(32)
-    with _trava:
-        _dispositivos.append({
-            "id": uuid.uuid4().hex[:8],
-            "hash": _hash(segredo),
-            "nome": (nome or email or "convidado")[:40],
-            "email": email,
-            "criado": datetime.now().isoformat(timespec="seconds"),
-            "visto": "",
-        })
-        _salvar_dispositivos()
-    return segredo
-
-
-def resgatar_convite(token):
-    alvo = _hash((token or "").strip())
-    with _trava:
-        for c in _convites:
-            if c["hash"] == alvo and not c.get("usado"):
-                c["usado"] = datetime.now().isoformat(timespec="seconds")
-                _salvar_convites()
-                nome = c.get("nome") or "convidado"
-                return _criar_dispositivo(nome), nome
-    return None, "convite invalido ou ja usado"
-
-
-def convite_valido(token):
-    alvo = _hash((token or "").strip())
-    return any(c["hash"] == alvo and not c.get("usado") for c in _convites)
 
 
 def _achar_por_hash(h):
@@ -1225,101 +1163,6 @@ def dono_ok(handler, query):
     enviado = token_enviado(handler, query)
     return bool(TOKEN) and hmac.compare_digest(enviado, TOKEN)
 
-
-PAGINA = r"""<!doctype html>
-<html lang="pt-BR"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<meta name="theme-color" content="#101114">
-<title>EKO</title>
-<link rel="manifest" href="/manifest.json">
-<link rel="icon" href="/icone.svg" type="image/svg+xml">
-<style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-background:#101114;color:#e8e8ea;padding:18px;max-width:640px;margin:0 auto}
-h1{font-size:20px;margin:0 0 2px;letter-spacing:.2px}
-.sub{color:#8a8d96;font-size:13px;margin-bottom:18px}
-textarea{width:100%;height:92px;background:#191b20;border:1px solid #2a2d35;border-radius:12px;
-color:#e8e8ea;padding:12px;font:14px/1.45 ui-monospace,monospace;resize:vertical}
-textarea:focus{outline:none;border-color:#3d8bff}
-button{width:100%;margin-top:10px;padding:14px;border:0;border-radius:12px;background:#3d8bff;
-color:#fff;font-weight:600;font-size:15px}
-button:active{background:#2f6fd0}
-button.sec{background:#23262d;color:#c9ccd4;font-weight:500}
-.fila{margin-top:22px}
-.item{background:#191b20;border:1px solid #24272e;border-radius:12px;padding:12px;margin-bottom:10px}
-.url{font-size:13px;color:#c9ccd4;word-break:break-all}
-.meta{font-size:12px;color:#8a8d96;margin-top:6px;display:flex;gap:8px;align-items:center}
-.tag{font-size:11px;padding:2px 8px;border-radius:99px;background:#2a2d35;color:#c9ccd4}
-.tag.ok{background:#12351f;color:#5bd68a}.tag.erro{background:#3b171a;color:#ff7b81}
-.tag.baixando{background:#122a44;color:#6cb2ff}.tag.na_fila{background:#2a2d35;color:#aab}
-.vazio{color:#6a6d76;font-size:13px;text-align:center;padding:24px 0}
-</style></head><body>
-<h1>EKO</h1>
-<div class="sub">Cole o link do vídeo ou da playlist. O servidor baixa, evita duplicata e organiza.</div>
-<textarea id="links" placeholder="https://youtube.com/playlist?list=...&#10;um link por linha"></textarea>
-<button onclick="enviar()" id="btn">Enviar para o servidor</button>
-<button class="sec" onclick="atualizar()">Atualizar</button>
-<button class="sec" onclick="location.href='/tocar'">♪ Tocar biblioteca</button>
-<button class="sec" onclick="location.href='http://'+location.hostname+':8080'">Abrir Navidrome</button>
-<div class="fila" id="fila"><div class="vazio">Carregando...</div></div>
-<script>
-const T = localStorage.getItem('garimpo_token') || '';
-async function enviar(){
-  const bruto = document.getElementById('links').value;
-  const urls = bruto.split(/\s+/).filter(x=>/^https?:\/\//i.test(x));
-  if(!urls.length){ alert('Cole um link http(s)'); return; }
-  const btn = document.getElementById('btn');
-  btn.disabled = true; btn.textContent = 'Enviando...';
-  try{
-    const r = await fetch('/api/enviar',{method:'POST',
-      headers:{'Content-Type':'application/json','X-Token':T},
-      body:JSON.stringify({urls})});
-    const j = await r.json();
-    if(r.status===401){ const t=prompt('Senha do servidor:'); if(t){localStorage.setItem('garimpo_token',t);location.reload();} return; }
-    document.getElementById('links').value='';
-    await atualizar();
-  }catch(e){ alert('Falhou: '+e); }
-  finally{ btn.disabled=false; btn.textContent='Enviar para o servidor'; }
-}
-function tag(s){
-  const mapa={na_fila:'na fila',baixando:'baixando',ok:'concluído',erro:'erro',interrompido:'interrompido'};
-  return `<span class="tag ${s}">${mapa[s]||s}</span>`;
-}
-async function atualizar(){
-  try{
-    const r = await fetch('/api/fila',{headers:{'X-Token':T}});
-    if(r.status===401){ document.getElementById('fila').innerHTML='<div class="vazio">Informe a senha.</div>'; return; }
-    const jobs = await r.json();
-    const alvo = document.getElementById('fila');
-    if(!jobs.length){ alvo.innerHTML='<div class="vazio">Nada na fila ainda.</div>'; return; }
-    alvo.innerHTML = jobs.map(j=>`<div class="item">
-      <div class="url">${(j.titulo||j.url).replace(/</g,'&lt;')}</div>
-      ${j.titulo?`<div class="url" style="opacity:.55">${j.url.replace(/</g,'&lt;')}</div>`:''}
-      <div class="meta">${tag(j.status)}<span>${j.terminado||j.criado}</span></div>
-      ${j.resumo?`<div class="meta">${j.resumo.replace(/</g,'&lt;')}</div>`:''}
-    </div>`).join('');
-  }catch(e){}
-}
-atualizar(); setInterval(atualizar, 4000);
-</script></body></html>
-"""
-
-MANIFEST = {
-    "name": "EKO", "short_name": "EKO", "start_url": "/", "display": "standalone",
-    "background_color": "#101114", "theme_color": "#101114",
-    "icons": [{"src": "/icone.svg", "sizes": "any", "type": "image/svg+xml"}],
-}
-
-ICONE = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192">
-<rect width="192" height="192" rx="42" fill="#101114"/>
-<circle cx="96" cy="104" r="52" fill="none" stroke="#3d8bff" stroke-width="12"/>
-<path d="M84 74v50a13 13 0 1 1-13-13" fill="none" stroke="#3d8bff" stroke-width="10" stroke-linecap="round"/>
-<path d="M84 74l33-9v44" fill="none" stroke="#e8e8ea" stroke-width="10" stroke-linecap="round"/>
-<circle cx="112" cy="122" r="9" fill="none" stroke="#e8e8ea" stroke-width="10"/>
-</svg>"""
 
 MANIFEST_TOCAR = {
     "name": "EKO Tocar", "short_name": "EKO Tocar", "start_url": "/tocar",
@@ -1921,160 +1764,6 @@ function esc(t) {
 """
 
 
-PAGINA_CONVITE = r"""<!doctype html>
-<html lang="pt-BR"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101114">
-<title>Convite EKO</title>
-<style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
-font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-background:#101114;color:#e8e8ea;padding:24px}
-.card{max-width:380px;width:100%;text-align:center;background:#191b20;border:1px solid #24272e;
-border-radius:24px;padding:28px 22px}
-.logo{width:76px;height:76px;margin:0 auto 16px;border-radius:50%;background:#26324a;
-display:flex;align-items:center;justify-content:center;font-size:34px;color:#bcd2ff}
-h1{font-size:22px;margin:0 0 6px}
-p{color:#9aa0ac;font-size:14px;margin:0 0 20px}
-.btn.alt{background:#23262d;color:#c9ccd4;margin-bottom:10px}
-a.btn{display:block;background:#3d8bff;color:#fff;text-decoration:none;font-weight:600;
-padding:15px;border-radius:16px;margin-bottom:14px}
-a.btn:active{background:#2f6fd0}
-.dica{font-size:12px;color:#767b86;margin:0}
-a.mini{display:inline-block;margin-top:14px;color:#6cb2ff;font-size:12px;text-decoration:none}
-</style></head>
-<body>
-<div class="card">
-  <div class="logo">♪</div>
-  <h1>Convite do EKO</h1>
-  <p>Este convite libera <b>um</b> aparelho.</p>
-  <a class="btn" href="/apk/eko.apk">Baixar o EKO</a>
-  <p class="dica">Se o Chrome avisar que o arquivo pode ser prejudicial, toque em
-  <b>“Baixar mesmo assim”</b> e permita instalar apps desta fonte.<br>
-  Depois de instalar, volte a este mesmo link: ele abre o app já autorizado.</p>
-  <a class="mini" href="eko://convite?t={{TOKEN}}">já instalei — abrir o app</a>
-</div>
-</body></html>
-"""
-
-PAGINA_PAINEL = r"""<!doctype html>
-<html lang="pt-BR"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Painel EKO</title>
-<style>
-:root{color-scheme:dark}
-*{box-sizing:border-box}
-body{margin:0;background:#101114;color:#e8e8ea;padding:18px;
-font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;max-width:640px;margin:0 auto}
-h1{font-size:20px;margin:0 0 4px}
-.sub{color:#8a8d96;font-size:13px;margin-bottom:18px}
-input{width:100%;background:#191b20;border:1px solid #2a2d35;border-radius:12px;color:#e8e8ea;
-padding:12px;font:14px ui-monospace,monospace;margin-bottom:10px}
-button{width:100%;padding:14px;border:0;border-radius:12px;background:#3d8bff;color:#fff;
-font-weight:600;font-size:15px;margin-bottom:10px}
-button.sec{background:#23262d;color:#c9ccd4;font-weight:500}
-.card{background:#191b20;border:1px solid #24272e;border-radius:14px;padding:14px;margin:10px 0}
-.link{font:12px ui-monospace,monospace;color:#6cb2ff;word-break:break-all;margin-top:8px}
-.dev{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #23262d}
-.dev:last-child{border:0}
-.dev b{font-size:14px}
-.dev span{color:#8a8d96;font-size:12px}
-.dev button{width:auto;padding:8px 12px;margin:0;background:#3b171a;color:#ff7b81;font-size:12px}
-h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:#7aa7ff;margin:22px 0 6px}
-</style></head>
-<body>
-<h1>Painel EKO</h1>
-<div class="sub">convites e aparelhos liberados</div>
-
-<input id="tok" type="password" placeholder="senha do servidor (token do dono)">
-<button class="sec" onclick="salvar()">Conectar</button>
-
-<h2>Convidar pessoa</h2>
-<input id="nome" placeholder="nome (ex.: Mãe, Pedro)">
-<button onclick="convidar()">Gerar convite</button>
-<div id="saida"></div>
-
-<h2>Aparelhos</h2>
-<div id="lista"></div>
-
-<script>
-const T = localStorage.getItem('eko_master') || '';
-document.getElementById('tok').value = T;
-if (T) carregar();
-
-async function api(rota, opcoes) {
-  const o = opcoes || {};
-  o.headers = Object.assign({'X-Token': T, 'Content-Type': 'application/json'}, o.headers || {});
-  const r = await fetch(rota, o);
-  let j = {};
-  try { j = await r.json(); } catch (e) {}
-  if (r.status === 401 || r.status === 403) throw new Error('senha do servidor inválida');
-  if (r.status >= 400) throw new Error(j.erro || ('erro ' + r.status));
-  return j;
-}
-
-function salvar() {
-  localStorage.setItem('eko_master', document.getElementById('tok').value.trim());
-  location.reload();
-}
-
-async function convidar() {
-  const nome = document.getElementById('nome').value.trim();
-  if (!nome) { alert('Diga o nome da pessoa'); return; }
-  try {
-    const j = await api('/api/convites', {method: 'POST', body: JSON.stringify({nome})});
-    document.getElementById('saida').innerHTML =
-      '<div class="card"><b>Convite de ' + esc(j.nome) + '</b>' +
-      '<div class="link" id="lk">' + esc(j.link) + '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:10px">' +
-      '<button class="sec" onclick="copiar()">Copiar link</button>' +
-      '<button class="sec" onclick="window.open(\'' + j.link + '\',\'_blank\')">Abrir</button></div>' +
-      '<div class="link">vale para 1 aparelho, uma vez só</div></div>';
-    document.getElementById('nome').value = '';
-    carregar();
-  } catch (e) { alert(e.message); }
-}
-
-function copiar() {
-  const t = document.getElementById('lk').textContent;
-  navigator.clipboard.writeText(t).then(() => alert('link copiado'));
-}
-
-async function carregar() {
-  try {
-    const d = await api('/api/dispositivos');
-    const alvo = document.getElementById('lista');
-    if (!d.length) { alvo.innerHTML = '<div class="card">Nenhum aparelho ainda.</div>'; return; }
-    alvo.innerHTML = d.map(x =>
-      '<div class="dev"><div style="flex:1"><b>' + esc(x.nome || x.email || 'aparelho') + '</b><br>' +
-      '<span>' + esc(x.email || 'convite') + ' · desde ' + esc((x.criado || '').replace('T', ' ')) +
-      (x.visto ? ' · visto ' + esc(x.visto.replace('T', ' ')) : '') + '</span></div>' +
-      '<button onclick="revogar(\'' + x.id + '\')">remover</button></div>'
-    ).join('');
-  } catch (e) {
-    document.getElementById('lista').innerHTML = '<div class="card">' + esc(e.message) + '</div>';
-  }
-}
-
-async function revogar(id) {
-  if (!confirm('Remover este aparelho?')) return;
-  try { await api('/api/revogar', {method: 'POST', body: JSON.stringify({id})}); carregar(); }
-  catch (e) { alert(e.message); }
-}
-
-function esc(t) {
-  return String(t == null ? '' : t).replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-</script>
-</body></html>
-"""
-
-
 ASSETLINKS = [{
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
@@ -2373,8 +2062,6 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(404, {"erro": "rota desconhecida"})
         if rota == "/painel" or rota.startswith("/convite/"):
             return self._json(404, {"erro": "rota desconhecida"})
-        if rota == "/manifest.json":
-            return self._json(200, MANIFEST)
         if rota == "/icone.svg":
             return self._responder(200, ICONE, "image/svg+xml")
         if rota == "/health":
