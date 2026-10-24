@@ -2100,6 +2100,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._enviar_apk("eko.apk")
         if rota == "/apk/player.apk":
             return self._enviar_apk("player.apk")
+        if rota.startswith("/apk/player-") and rota.endswith(".apk"):
+            return self._enviar_apk(rota.rsplit("/", 1)[-1])
         if rota == "/api/estado":
             return self._json(200, {
                 "precisa_setup": not _ha_admin(),
