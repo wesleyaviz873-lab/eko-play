@@ -1582,6 +1582,13 @@ carregar();
 """
 
 
+def _pagina_instalar():
+    dados = _versao()
+    nome = str(dados.get("version_name") or "")
+    texto = f"versao {nome}" if nome else ""
+    return PAGINA_INICIO.replace("{{VERSAO}}", texto)
+
+
 def _versao():
     try:
         dados = json.loads((APK_DIR / "versao.json").read_text(encoding="utf-8"))
@@ -1613,16 +1620,18 @@ h1{font-size:26px;margin:0 0 4px;letter-spacing:3px}
 p{color:#9aa0ac;font-size:14px;margin:0 0 22px}
 a.btn{display:block;background:#3d8bff;color:#fff;text-decoration:none;font-weight:600;
 padding:15px;border-radius:16px;margin-bottom:12px}
+.logo-img{width:112px;height:112px;margin:0 auto 16px;border-radius:50%;display:block}
+.versao{color:#767b86;font-size:12px;margin-top:2px}
 a.btn.alt{background:#23262d;color:#c9ccd4}
 .passo{text-align:left;color:#8a8d96;font-size:13px;margin:18px 0 0;padding-left:18px}
 .passo li{margin-bottom:6px}
 </style></head>
 <body>
 <div class="card">
-  <div class="logo">♪</div>
-  <h1>EKO</h1>
+  <img class="logo-img" src="/logo.png" alt="EKO Play">
+  <h1>EKO Play</h1>
   <a class="btn" href="/apk/eko.apk">Baixar</a>
-  {{PLAYER}}
+  <div class="versao">{{VERSAO}}</div>
 </div>
 </body></html>
 """
@@ -1809,6 +1818,13 @@ class Handler(BaseHTTPRequestHandler):
 
     def _json(self, codigo, obj):
         self._responder(codigo, json.dumps(obj, ensure_ascii=False))
+
+    def _enviar_logo(self):
+        caminho = APK_DIR / "logo.png"
+        if not caminho.is_file():
+            return self._json(404, {"erro": "logo nao publicada"})
+        dados = caminho.read_bytes()
+        return self._responder(200, dados, "image/png")
 
     def _enviar_apk(self, nome="eko.apk"):
         caminho = APK_DIR / nome
@@ -2049,14 +2065,14 @@ class Handler(BaseHTTPRequestHandler):
             if (APK_DIR / "player.apk").is_file():
                 extra = '<a class="btn alt" href="/apk/player.apk">Baixar o player</a>'
             return self._responder(
-                200, PAGINA_INICIO.replace("{{PLAYER}}", extra), "text/html; charset=utf-8"
+                200, _pagina_instalar(), "text/html; charset=utf-8"
             )
         if rota in ("/", "/index.html"):
             extra = ""
             if (APK_DIR / "player.apk").is_file():
                 extra = '<a class="btn alt" href="/apk/player.apk">Baixar o player</a>'
             return self._responder(
-                200, PAGINA_INICIO.replace("{{PLAYER}}", extra), "text/html; charset=utf-8"
+                200, _pagina_instalar(), "text/html; charset=utf-8"
             )
         if rota in ("/fila", "/fila/"):
             return self._json(404, {"erro": "rota desconhecida"})
@@ -2074,6 +2090,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._json(200, ASSETLINKS)
         if rota == "/api/versao":
             return self._json(200, _versao())
+        if rota == "/logo.png":
+            return self._enviar_logo()
         if rota == "/apk/eko.apk":
             return self._enviar_apk("eko.apk")
         if rota == "/apk/player.apk":

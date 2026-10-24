@@ -1,16 +1,20 @@
-# EKO
+# EKO Play
 
 Servidor de música caseiro com app Android próprio: baixa do YouTube para o seu
 computador, organiza a biblioteca e toca no celular de quem você autorizar.
 
 Roda na sua máquina. Não é nuvem, não tem assinatura, não tem anúncio.
 
+| Início | Baixar | Administração |
+|---|---|---|
+| <img src="docs/screenshots/01-inicio.jpg" width="230"> | <img src="docs/screenshots/04-download.jpg" width="230"> | <img src="docs/screenshots/06-gerenciar.jpg" width="230"> |
+
 ---
 
 ## Como funciona
 
 ```
-celular (EKO)                          seu computador
+celular (EKO Play)                     seu computador
 ┌────────────────────┐    HTTPS    ┌──────────────────────────┐
 │ navegador YouTube  │ ──────────► │ servidor.py (API + fila) │
 │ botão Baixar       │             │   ├─ yt-dlp (download)   │
@@ -35,6 +39,8 @@ pelo Navidrome e administra quem tem acesso.
   por lista baixada.
 - **Administração no app**: aprovar entrada, promover/remover administrador.
 - **Login com Google** ou entrada por aprovação, com HTTPS e chaves por aparelho.
+- **Login alternativo** por usuário e senha do Navidrome, para quem prefere não
+  usar Google.
 
 ## Instalação
 
