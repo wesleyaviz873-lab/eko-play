@@ -960,10 +960,12 @@ def trabalhar():
                 salvar_fila()
             itens, titulo_playlist = expandir_url(job["url"])
             if len(itens) > 1:
-                criados, ja = criar_filhos(itens, job)
                 with _trava:
                     if titulo_playlist:
                         job["titulo"] = titulo_playlist
+                    salvar_fila()
+                criados, ja = criar_filhos(itens, job)
+                with _trava:
                     job["status"] = "ok"
                     job["resumo"] = (f"{criados} faixas na fila"
                                      + (f" · {ja} ja no acervo" if ja else ""))
@@ -1004,6 +1006,14 @@ def trabalhar():
                     cwd=str(ROOT), timeout=60 * 60 * 6,
                 )
             texto = saida_path.read_text(encoding="utf-8", errors="replace")
+            achado_dup = re.search(r"DUP_ARQUIVO: (.+)", texto)
+            if achado_dup and job.get("modo") != "video":
+                caminho_dup = achado_dup.group(1).strip()
+                with _trava:
+                    job["arquivo"] = caminho_dup
+                    salvar_fila()
+                if job.get("origem"):
+                    _anexar_downloads(job["origem"], caminho_dup)
             if job.get("modo") == "video":
                 achado_arq = re.search(r"ARQUIVO: (.+)", texto)
                 with _trava:
@@ -1132,13 +1142,16 @@ def _anexar_na_playlist(pai_id, arquivo):
     destino = pasta / "_playlists"
     destino.mkdir(parents=True, exist_ok=True)
     m3u = destino / f"{nome}.m3u"
+    linha = str(Path(arquivo).resolve()).replace("\\", "/")
     try:
         with _trava:
             novo = not m3u.exists()
+            if not novo and linha in m3u.read_text(encoding="utf-8").splitlines():
+                return
             with m3u.open("a", encoding="utf-8") as f:
                 if novo:
                     f.write("#EXTM3U\n")
-                f.write(str(Path(arquivo).resolve()).replace("\\", "/") + "\n")
+                f.write(linha + "\n")
     except OSError:
         pass
 
@@ -1155,13 +1168,16 @@ def _anexar_downloads(nome, arquivo):
     destino = pasta / "_playlists"
     destino.mkdir(parents=True, exist_ok=True)
     m3u = destino / f"Baixadas - {nome}.m3u"
+    linha = str(Path(arquivo).resolve()).replace("\\", "/")
     try:
         with _trava:
             novo = not m3u.exists()
+            if not novo and linha in m3u.read_text(encoding="utf-8").splitlines():
+                return
             with m3u.open("a", encoding="utf-8") as f:
                 if novo:
                     f.write("#EXTM3U\n")
-                f.write(str(Path(arquivo).resolve()).replace("\\", "/") + "\n")
+                f.write(linha + "\n")
     except OSError:
         pass
 
@@ -1178,6 +1194,13 @@ def criar_filhos(itens, pai):
             url = "https://www.youtube.com/watch?v=" + yt_id
             if bib.ja_existe_id(yt_id) or url in pendentes:
                 ja_tinha += 1
+                existente = bib.por_id.get(yt_id) or {}
+                rel = existente.get("path")
+                if rel:
+                    caminho_existente = g.caminho(CFG, "music_dir") / rel
+                    if caminho_existente.is_file():
+                        _anexar_na_playlist(pai["id"], str(caminho_existente))
+                        _anexar_downloads(pai.get("origem"), str(caminho_existente))
                 continue
             _fila.append({
                 "id": uuid.uuid4().hex[:8], "url": url,

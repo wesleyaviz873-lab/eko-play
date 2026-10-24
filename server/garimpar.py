@@ -534,8 +534,8 @@ def importar(item, arquivo, cfg, bib):
     album = (info.get("album") or item.get("album") or "").strip()
     if tem_versao(titulo) and not re.search(r"[\[\(]", titulo):
         titulo = f"{titulo} [{_marcador_versao(titulo)}]"
-    if not album or album in ("Singles", "Acervo"):
-        album = titulo
+    if not album or album in ("Acervo",):
+        album = "Singles"
 
     duracao = float(info.get("duration") or item["duration"] or 0)
     fpcalc = caminho(cfg, "fpcalc")
@@ -552,6 +552,8 @@ def importar(item, arquivo, cfg, bib):
                            "erro_fp": dup.get("_erro", ""),
                            "data": datetime.now().isoformat(timespec="seconds")})
             log.info("DUPLICATA (audio): %s == %s (erro %.3f)", item["title"], dup.get("title"), dup.get("_erro", 0))
+            if dup.get("path"):
+                print("DUP_ARQUIVO: " + str(caminho(cfg, "music_dir") / dup["path"]))
             return "duplicata", dup
 
     music = caminho(cfg, "music_dir")
