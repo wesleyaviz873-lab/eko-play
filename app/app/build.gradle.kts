@@ -1,4 +1,4 @@
-﻿import java.util.Properties
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,8 +16,8 @@ android {
         applicationId = "eco.c.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 25
-        versionName = "1.2.1-beta2"
+        versionCode = 23
+        versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
