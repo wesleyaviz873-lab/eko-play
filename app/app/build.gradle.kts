@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -16,7 +16,7 @@ android {
         applicationId = "eco.c.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 23
+        versionCode = 30
         versionName = "1.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -161,6 +161,10 @@ dependencies {
     // Unit tests (JVM) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â queue transform logic
     testImplementation(libs.junit)
 }
+
+
+
+
 
 
 
