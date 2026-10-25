@@ -1,4 +1,4 @@
-import java.util.Properties
+﻿import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
@@ -8,41 +8,33 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
-val segredosLocais = Properties().apply {
-    val arquivo = rootProject.file("local.properties")
-    if (arquivo.exists()) arquivo.inputStream().use { load(it) }
-}
-
-fun local(nome: String): String =
-    (segredosLocais.getProperty(nome) ?: System.getenv(nome) ?: "").trim()
-
 android {
     namespace = "com.resonance.music"
     compileSdk = 35
 
     defaultConfig {
         applicationId = "eco.c.player"
-        minSdk = 31
+        minSdk = 26
         targetSdk = 35
-        versionCode = 16
-        versionName = "1.1.12"
+        versionCode = 25
+        versionName = "1.2.1-beta2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField(
             "String",
             "GOOGLE_WEB_CLIENT_ID",
-            "\"${local("GOOGLE_WEB_CLIENT_ID")}\""
+            "\"22478660682-utluikauhsg34gi4geoo9gpoloafoktd.apps.googleusercontent.com\""
         )
         buildConfigField(
             "String",
             "EKO_SERVER_URL",
-            "\"${local("EKO_SERVER_URL").ifBlank { "http://10.0.2.2:8787" }}\""
+            "\"https://eko.rebeek.com\""
         )
     }
 
     // From-source builds (e.g. F-Droid) have no signing material; only wire up a
-    // release signing config when it's actually provided â€” via a local
+    // release signing config when it's actually provided ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â via a local
     // signing.properties or CI environment variables. Otherwise the release build
     // stays unsigned and still compiles, so it can be built from source and signed
     // downstream.
@@ -166,7 +158,15 @@ dependencies {
     // Reorderable queue (Compose 1.6-compatible line)
     implementation(libs.reorderable)
 
-    // Unit tests (JVM) â€” queue transform logic
+    // Unit tests (JVM) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â queue transform logic
     testImplementation(libs.junit)
 }
+
+
+
+
+
+
+
+
 

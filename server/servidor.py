@@ -1593,9 +1593,12 @@ def _pagina_instalar():
     return PAGINA_INICIO.replace("{{VERSAO}}", texto)
 
 
-def _versao():
+def _versao(admin=False):
+    arquivo = APK_DIR / "versao-admin.json" if admin else APK_DIR / "versao.json"
+    if admin and not arquivo.is_file():
+        arquivo = APK_DIR / "versao.json"
     try:
-        dados = json.loads((APK_DIR / "versao.json").read_text(encoding="utf-8"))
+        dados = json.loads(arquivo.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         def vazia():
             return {"version_code": 0, "version_name": "", "apk_url": "", "notas": ""}
@@ -2098,11 +2101,14 @@ class Handler(BaseHTTPRequestHandler):
         if rota == "/.well-known/assetlinks.json":
             return self._json(200, ASSETLINKS)
         if rota == "/api/versao":
-            return self._json(200, _versao())
+            papel = papel_do_token(token_enviado(self, query))
+            return self._json(200, _versao(admin=papel in ("admin", "root")))
         if rota == "/logo.png":
             return self._enviar_logo()
         if rota == "/apk/eko.apk":
             return self._enviar_apk("eko.apk")
+        if rota == "/apk/eko8.apk":
+            return self._enviar_apk("eko-android8.apk")
         if rota == "/apk/player.apk":
             return self._enviar_apk("player.apk")
         if rota.startswith("/apk/player-") and rota.endswith(".apk"):
