@@ -517,6 +517,174 @@ def gravar_tags(arquivo, artista, titulo, album, numero):
         log.warning("nao consegui etiquetar %s: %s", arquivo.name, exc)
 
 
+def buscar_capa(artista, titulo):
+    """Busca a capa no iTunes (gratuito, sem chave). Devolve os bytes ou None."""
+    import urllib.parse
+    import urllib.request
+
+    consulta = f"{artista} {titulo}".strip()
+    if not consulta:
+        return None
+    consulta = re.sub(r"\s*\([^)]*\)", "", consulta)[:120]
+    url = "https://itunes.apple.com/search?" + urllib.parse.urlencode(
+        {"term": consulta, "entity": "song", "limit": 1, "country": "BR"}
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resposta:
+            dados = json.loads(resposta.read().decode("utf-8", "replace"))
+        itens = dados.get("results") or []
+        if not itens:
+            return None
+        arte = itens[0].get("artworkUrl100") or ""
+        if not arte:
+            return None
+        arte = arte.replace("100x100bb", "600x600bb").replace("100x100", "600x600")
+        with urllib.request.urlopen(arte, timeout=20) as resposta:
+            return resposta.read()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def gravar_capa(arquivo, dados):
+    if not dados:
+        return
+    try:
+        from mutagen.id3 import APIC, ID3, error
+    except Exception:  # noqa: BLE001
+        return
+    try:
+        try:
+            tag = ID3(arquivo)
+        except error:
+            tag = ID3()
+        if tag.getall("APIC"):
+            return
+        tipo = "image/png" if dados[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+        tag.add(APIC(encoding=3, mime=tipo, type=3, desc="Cover", data=dados))
+        tag.save(arquivo, v2_version=3)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("nao consegui gravar capa em %s: %s", arquivo.name, exc)
+
+
+def capas_pendentes(cfg):
+    from mutagen.id3 import ID3
+
+    cat = caminho(cfg, "state_dir") / "catalogo.jsonl"
+    if not cat.exists():
+        return 0
+    music = caminho(cfg, "music_dir")
+    feitos = 0
+    vistos = set()
+    for linha in cat.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        try:
+            d = json.loads(linha)
+        except json.JSONDecodeError:
+            continue
+        rel = d.get("path") or ""
+        if not rel or rel in vistos:
+            continue
+        vistos.add(rel)
+        arq = music / rel
+        if not arq.is_file():
+            continue
+        try:
+            if ID3(arq).getall("APIC"):
+                continue
+        except Exception:  # noqa: BLE001
+            pass
+        dados = buscar_capa(d.get("artist") or "", d.get("title") or "")
+        if dados:
+            gravar_capa(arq, dados)
+            feitos += 1
+            print("capa:", rel)
+    return feitos
+
+
+def capa_album(artista, album):
+    """Capa oficial do album no Deezer (quadrada, 1000px)."""
+    import urllib.parse
+    import urllib.request
+
+    consulta = f"{artista} {album}".strip()
+    if not consulta or album in ("Singles", ""):
+        consulta = f"{artista}".strip()
+    consulta = re.sub(r"\s*\([^)]*\)", "", consulta)[:120]
+    url = "https://api.deezer.com/search/album?" + urllib.parse.urlencode(
+        {"q": consulta, "limit": 1}
+    )
+    try:
+        with urllib.request.urlopen(url, timeout=15) as resposta:
+            dados = json.loads(resposta.read().decode("utf-8", "replace"))
+        itens = dados.get("data") or []
+        if not itens:
+            return None
+        arte = itens[0].get("cover_xl") or itens[0].get("cover_big") or ""
+        if not arte:
+            return None
+        with urllib.request.urlopen(arte, timeout=20) as resposta:
+            return resposta.read()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def trocar_capa(arquivo, dados):
+    if not dados:
+        return False
+    try:
+        from mutagen.id3 import APIC, ID3, error
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        try:
+            tag = ID3(arquivo)
+        except error:
+            tag = ID3()
+        tag.delall("APIC")
+        tipo = "image/png" if dados[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+        tag.add(APIC(encoding=3, mime=tipo, type=3, desc="Cover", data=dados))
+        tag.save(arquivo, v2_version=3)
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("nao consegui trocar a capa de %s: %s", arquivo.name, exc)
+        return False
+
+
+def capas_por_album(cfg):
+    """Troca as capas por arte oficial do album (uma busca por album)."""
+    cat = caminho(cfg, "state_dir") / "catalogo.jsonl"
+    if not cat.exists():
+        return 0
+    music = caminho(cfg, "music_dir")
+    grupos = {}
+    for linha in cat.read_text(encoding="utf-8").splitlines():
+        if not linha.strip():
+            continue
+        try:
+            d = json.loads(linha)
+        except json.JSONDecodeError:
+            continue
+        rel = d.get("path") or ""
+        if not rel:
+            continue
+        chave = ((d.get("artist") or "").strip(), (d.get("album") or "").strip())
+        grupos.setdefault(chave, []).append(rel)
+    trocados = 0
+    for (artista, album), caminhos in grupos.items():
+        if not artista:
+            continue
+        dados = capa_album(artista, album)
+        if not dados:
+            continue
+        for rel in caminhos:
+            arq = music / rel
+            if arq.is_file() and trocar_capa(arq, dados):
+                trocados += 1
+        print(f"capa: {artista} / {album} ({len(caminhos)} faixas)")
+    return trocados
+
+
 def importar(item, arquivo, cfg, bib):
     info_path = arquivo.with_suffix(".info.json")
     info = {}
@@ -566,6 +734,8 @@ def importar(item, arquivo, cfg, bib):
     destino = destino_dir / f"{numero:02d} - {nome_seguro(titulo)}.{cfg['audio_format']}"
     shutil.move(str(arquivo), str(destino))
     gravar_tags(destino, artista, titulo, album, numero)
+    if cfg.get("capa_auto", True):
+        gravar_capa(destino, buscar_capa(artista, titulo))
     if not cfg["keep_info_json"]:
         info_path.unlink(missing_ok=True)
     limpar_inbox(caminho(cfg, "inbox_dir"), arquivo.stem)
@@ -735,6 +905,9 @@ def main():
     ap.add_argument("--max", type=int, default=0, help="limite de downloads nesta rodada")
     ap.add_argument("--force", action="store_true", help="ignora a checagem de espaco")
     ap.add_argument("--status", action="store_true", help="mostra o estado da biblioteca")
+    ap.add_argument("--capas", action="store_true", help="busca capas que faltam")
+    ap.add_argument("--capas-forcar", action="store_true",
+                    help="troca as capas pela arte oficial do album (Deezer)")
     ap.add_argument("--autoteste", action="store_true", help="testa as funcoes internas")
     ap.add_argument("--listar", metavar="URL", help="so lista as faixas do link em JSON")
     ap.add_argument("--procurar", metavar="URL", help="busca o video no YouTube sem baixar")
@@ -759,6 +932,12 @@ def main():
         return autoteste(cfg)
     if args.status:
         status(cfg)
+        return 0
+    if args.capas:
+        print(f"capas baixadas: {capas_pendentes(cfg)}")
+        return 0
+    if args.capas_forcar:
+        print(f"capas trocadas: {capas_por_album(cfg)}")
         return 0
     if args.listar:
         itens = expandir(args.listar, cfg)
