@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Servidor do EKO: recebe links pelo celular e coloca na fila de download."""
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -86,6 +87,24 @@ def _falhou_auth(ip):
             _falhas.pop(ip, None)
             _bloqueados[ip] = agora + 900
             print(f" EKO: {ip} bloqueado 15 min por tentativas")
+
+
+def sincronizar_mini():
+    rclone = Path(r"D:\eko\tools\rclone\rclone-v1.75.2-windows-amd64\rclone.exe")
+    config = Path(r"D:\eko\tools\rclone\rclone.conf")
+    if not rclone.is_file() or not config.is_file():
+        return
+    try:
+        subprocess.run(
+            [str(rclone), "sync", str(g.caminho(CFG, "music_dir")),
+             "minipc:/srv/eko/music", "--config", str(config),
+             "--update", "--transfers", "4", "--checkers", "8",
+             "--exclude", "*.tmp", "--exclude", "*.part"],
+            timeout=180, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL, check=False,
+        )
+    except Exception:
+        pass
 
 
 def escanear_navidrome():
@@ -370,6 +389,25 @@ def _salvar_contas_nav():
 
 _contas_nav = _carregar_contas_nav()
 
+
+def nome_por_usuario(usuario):
+    usuario = str(usuario or "").strip()
+    if not usuario:
+        return ""
+    email = ""
+    with _trava:
+        for conta in _contas_nav:
+            if conta.get("usuario") == usuario:
+                email = str(conta.get("email") or "").strip().lower()
+                break
+        if email:
+            for d in _dispositivos:
+                if str(d.get("email") or "").strip().lower() == email and d.get("nome"):
+                    return str(d.get("nome"))
+            for p in _pessoas:
+                if str(p.get("email") or "").strip().lower() == email and p.get("nome"):
+                    return str(p.get("nome"))
+    return ""
 
 def _nav_ping(usuario, senha):
     base = str(CFG.get("navidrome_url") or "").rstrip("/")
@@ -910,7 +948,7 @@ def trabalhar():
                 with _trava:
                     job["status"] = "ok"
                     job["resumo"] = (f"{criados} faixas na fila"
-                                     + (f" · {ja} ja no acervo" if ja else ""))
+                                     + (f" Â· {ja} ja no acervo" if ja else ""))
                     job["terminado"] = datetime.now().isoformat(timespec="seconds")
                     salvar_fila()
                 continue
@@ -993,6 +1031,7 @@ def trabalhar():
                     _anexar_na_playlist(job["pai"], arq)
                 if arq:
                     _anexar_downloads(job.get("origem"), arq)
+                    sincronizar_mini()
                 escanear_navidrome()
         except subprocess.TimeoutExpired:
             with _trava:
@@ -1084,7 +1123,7 @@ def _anexar_na_playlist(pai_id, arquivo):
     destino = pasta / "_playlists"
     destino.mkdir(parents=True, exist_ok=True)
     m3u = destino / f"{nome}.m3u"
-    linha = str(Path(arquivo).resolve()).replace("\\", "/")
+    linha = os.path.relpath(Path(arquivo).resolve(), destino.resolve()).replace("\\", "/")
     try:
         with _trava:
             novo = not m3u.exists()
@@ -1110,7 +1149,7 @@ def _anexar_downloads(nome, arquivo):
     destino = pasta / "_playlists"
     destino.mkdir(parents=True, exist_ok=True)
     m3u = destino / f"Baixadas - {nome}.m3u"
-    linha = str(Path(arquivo).resolve()).replace("\\", "/")
+    linha = os.path.relpath(Path(arquivo).resolve(), destino.resolve()).replace("\\", "/")
     try:
         with _trava:
             novo = not m3u.exists()
@@ -1253,10 +1292,10 @@ main{padding:10px 10px 0}
   <div class="titulo"><h1>EKO</h1><span id="total">biblioteca</span></div>
   <div class="acoes">
     <button id="tocarTudo">Tocar tudo</button>
-    <button id="aleatorio" class="sec" aria-pressed="false">Aleatório</button>
-    <button id="radio">Rádio inteligente</button>
+    <button id="aleatorio" class="sec" aria-pressed="false">AleatÃ³rio</button>
+    <button id="radio">RÃ¡dio inteligente</button>
   </div>
-  <input id="busca" type="search" placeholder="Buscar música, artista ou álbum" autocomplete="off">
+  <input id="busca" type="search" placeholder="Buscar mÃºsica, artista ou Ã¡lbum" autocomplete="off">
 </header>
 
 <main id="lista"><div class="vazio">Carregando...</div></main>
@@ -1272,16 +1311,16 @@ main{padding:10px 10px 0}
 
 <div class="player" id="player">
   <div class="progresso">
-    <input id="progresso" type="range" min="0" max="1000" value="0" step="1" aria-label="posição">
+    <input id="progresso" type="range" min="0" max="1000" value="0" step="1" aria-label="posiÃ§Ã£o">
   </div>
   <div class="tempos"><span id="atual">0:00</span><span id="duracao">0:00</span></div>
   <div class="linha">
     <img id="capa" alt="">
-    <div class="info"><b id="nome">—</b><span id="artista"></span></div>
+    <div class="info"><b id="nome">â€”</b><span id="artista"></span></div>
     <div class="controles">
-      <button id="anterior" aria-label="anterior">⏮</button>
-      <button id="play" aria-label="tocar">▶</button>
-      <button id="proxima" aria-label="próxima">⏭</button>
+      <button id="anterior" aria-label="anterior">â®</button>
+      <button id="play" aria-label="tocar">â–¶</button>
+      <button id="proxima" aria-label="prÃ³xima">â­</button>
     </div>
   </div>
 </div>
@@ -1358,7 +1397,7 @@ async function carregar() {
     render();
     if (autoRadio && faixas.length) setTimeout(() => iniciarRadio(), 500);
   } catch (e) {
-    $('lista').innerHTML = '<div class="vazio">Não consegui falar com o servidor.<br>' + esc(e.message) + '</div>';
+    $('lista').innerHTML = '<div class="vazio">NÃ£o consegui falar com o servidor.<br>' + esc(e.message) + '</div>';
   }
 }
 
@@ -1368,11 +1407,11 @@ function render() {
     ? faixas.filter(f => (f.artist + ' ' + f.title + ' ' + f.album).toLowerCase().includes(q))
     : faixas;
   if (!faixas.length) {
-    $('lista').innerHTML = '<div class="vazio">A biblioteca está vazia.<br>Baixe algo primeiro.</div>';
+    $('lista').innerHTML = '<div class="vazio">A biblioteca estÃ¡ vazia.<br>Baixe algo primeiro.</div>';
     return;
   }
   if (!lista.length) {
-    $('lista').innerHTML = '<div class="vazio">Nada encontrado para “' + esc(q) + '”.</div>';
+    $('lista').innerHTML = '<div class="vazio">Nada encontrado para â€œ' + esc(q) + 'â€.</div>';
     return;
   }
   $('lista').innerHTML = lista.map((f, i) => {
@@ -1381,7 +1420,7 @@ function render() {
     return '<button class="faixa' + ativo + '" data-i="' + i + '">' +
       '<span class="capa" style="background:' + cor(f.id) + '">' + esc(inicial) + '</span>' +
       '<span class="texto"><b>' + esc(f.title) + '</b><small>' +
-      esc(f.artist) + (f.album ? ' · ' + esc(f.album) : '') + '</small></span>' +
+      esc(f.artist) + (f.album ? ' Â· ' + esc(f.album) : '') + '</small></span>' +
       '<span class="tempo">' + fmt(f.duration) + '</span></button>';
   }).join('');
   document.querySelectorAll('.faixa').forEach(el => {
@@ -1402,7 +1441,7 @@ function tocar(f) {
   atualId = f.id;
   audio.src = urlDe(f);
   $('nome').textContent = f.title;
-  $('artista').textContent = f.artist + (f.album ? ' · ' + f.album : '');
+  $('artista').textContent = f.artist + (f.album ? ' Â· ' + f.album : '');
   const img = $('capa');
   img.src = capaDe(f);
   img.onerror = () => { img.style.visibility = 'hidden'; };
@@ -1417,7 +1456,7 @@ function tocar(f) {
 
 function tocarLista(lista, i) {
   radioAtivo = false;
-  $('radio').textContent = 'Rádio inteligente';
+  $('radio').textContent = 'RÃ¡dio inteligente';
   fila = lista.slice();
   idx = i;
   tocar(fila[idx]);
@@ -1448,7 +1487,7 @@ async function iniciarRadio() {
   radioAtivo = true;
   aleatorio = false;
   $('aleatorio').setAttribute('aria-pressed', 'false');
-  $('radio').textContent = 'Rádio ligada';
+  $('radio').textContent = 'RÃ¡dio ligada';
   try {
     const r = await fetch('/api/radio?titulo=' + encodeURIComponent(base.title) + '&artista=' + encodeURIComponent(base.artist) + '&n=20', {headers: {'X-Token': token}});
     if (!r.ok) throw new Error('erro ' + r.status);
@@ -1496,7 +1535,7 @@ function anterior() {
 }
 
 function pintarPlay() {
-  $('play').textContent = audio.paused ? '▶' : '⏸';
+  $('play').textContent = audio.paused ? 'â–¶' : 'â¸';
   $('play').setAttribute('aria-label', audio.paused ? 'tocar' : 'pausar');
   if ('mediaSession' in navigator) {
     navigator.mediaSession.playbackState = audio.paused ? 'paused' : 'playing';
@@ -1525,7 +1564,7 @@ audio.addEventListener('timeupdate', () => {
   }
 });
 audio.addEventListener('error', () => {
-  $('artista').textContent = 'não consegui tocar esta faixa';
+  $('artista').textContent = 'nÃ£o consegui tocar esta faixa';
 });
 
 $('progresso').addEventListener('input', () => {
@@ -1593,10 +1632,85 @@ def _pagina_instalar():
     return PAGINA_INICIO.replace("{{VERSAO}}", texto)
 
 
+NOTICIAS_AUDIO = ROOT / "noticias_audio"
+
+
+def _noticias_indice() -> dict:
+    arquivo = NOTICIAS_AUDIO / "indice.json"
+    try:
+        return json.loads(arquivo.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _noticias_indice_gravar(dados: dict) -> None:
+    try:
+        NOTICIAS_AUDIO.mkdir(exist_ok=True)
+        (NOTICIAS_AUDIO / "indice.json").write_text(
+            json.dumps(dados, ensure_ascii=False), encoding="utf-8"
+        )
+    except OSError:
+        pass
+
+
+def _noticias_lista(categoria: str, cidade: str) -> dict:
+    import noticias as motor
+
+    brutas = motor.carregar(categoria, cidade)
+    escolhidas = motor.curar(brutas, 8)
+    indice = _noticias_indice()
+    itens = []
+    for noticia in escolhidas:
+        ident = hashlib.sha1(noticia.link.encode("utf-8")).hexdigest()[:14]
+        manchete = noticia.manchete or noticia.titulo
+        fala = noticia.fala or ""
+        indice[ident] = {
+            "manchete": manchete,
+            "fala": fala,
+            "fonte": noticia.fonte,
+            "link": noticia.link,
+        }
+        itens.append({
+            "id": ident,
+            "manchete": manchete,
+            "fala": fala,
+            "fonte": noticia.fonte,
+            "link": noticia.link,
+            "quando": noticia.quando,
+        })
+    if itens:
+        _noticias_indice_gravar(indice)
+    return {"categoria": categoria, "cidade": cidade, "itens": itens}
+
+
+def _noticia_audio(ident: str):
+    dados = _noticias_indice().get(ident)
+    if not dados:
+        return None
+    destino = NOTICIAS_AUDIO / f"{ident}.mp3"
+    if destino.is_file() and destino.stat().st_size > 1000:
+        return destino
+    import noticias as motor
+
+    texto = motor.para_fala(
+        f"{dados.get('manchete', '')}. {dados.get('fala', '')}"
+    )
+    try:
+        ok = asyncio.run(motor.gerar_audio(texto, destino))
+    except Exception:
+        ok = False
+    return destino if ok and destino.is_file() else None
+
+
 def _versao(admin=False):
-    arquivo = APK_DIR / "versao-admin.json" if admin else APK_DIR / "versao.json"
-    if admin and not arquivo.is_file():
-        arquivo = APK_DIR / "versao.json"
+    if admin:
+        arquivo = APK_DIR / "versao-admin.json"
+        if not arquivo.is_file():
+            arquivo = APK_DIR / "versao.json"
+    else:
+        arquivo = APK_DIR / "versao-publico.json"
+        if not arquivo.is_file():
+            arquivo = APK_DIR / "versao.json"
     try:
         dados = json.loads(arquivo.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -1669,19 +1783,19 @@ button:disabled{opacity:.6}
 .dica{font-size:11px;color:#6a6d76;margin:16px 0 0}
 </style></head><body>
 <div class="card">
-  <div class="logo">♪</div>
+  <div class="logo">â™ª</div>
   <h1>Criar conta</h1>
-  <p>Peça acesso. O dono aprova antes de você entrar.</p>
+  <p>PeÃ§a acesso. O dono aprova antes de vocÃª entrar.</p>
   <form id="f">
     <input id="nome" placeholder="Seu nome" autocomplete="name" required>
-    <input id="usuario" placeholder="Usuário (sem espaços)" autocomplete="username" required>
+    <input id="usuario" placeholder="UsuÃ¡rio (sem espaÃ§os)" autocomplete="username" required>
     <input id="email" type="email" placeholder="E-mail (opcional)" autocomplete="email">
-    <input id="senha" type="password" placeholder="Senha (mínimo 6)" autocomplete="new-password" required>
+    <input id="senha" type="password" placeholder="Senha (mÃ­nimo 6)" autocomplete="new-password" required>
     <input id="senha2" type="password" placeholder="Repita a senha" autocomplete="new-password" required>
     <button type="submit" id="btn">Pedir acesso</button>
   </form>
   <div id="msg"></div>
-  <p class="dica">Depois da aprovação, entre no app ou na web com o mesmo usuário e senha.</p>
+  <p class="dica">Depois da aprovaÃ§Ã£o, entre no app ou na web com o mesmo usuÃ¡rio e senha.</p>
 </div>
 <script>
 const $ = (id) => document.getElementById(id);
@@ -1693,8 +1807,8 @@ $('f').addEventListener('submit', async (e) => {
   const email = $('email').value.trim();
   const senha = $('senha').value;
   const senha2 = $('senha2').value;
-  if (!nome || !usuario || !senha) { mostrar('Preencha nome, usuário e senha.'); return; }
-  if (senha !== senha2) { mostrar('As senhas não conferem.'); return; }
+  if (!nome || !usuario || !senha) { mostrar('Preencha nome, usuÃ¡rio e senha.'); return; }
+  if (senha !== senha2) { mostrar('As senhas nÃ£o conferem.'); return; }
   if (senha.length < 6) { mostrar('A senha precisa ter pelo menos 6 caracteres.'); return; }
   $('btn').disabled = true; $('btn').textContent = 'Enviando...';
   try {
@@ -1703,7 +1817,7 @@ $('f').addEventListener('submit', async (e) => {
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.erro || ('erro ' + r.status));
     $('f').style.display = 'none';
-    mostrar('Pedido enviado! Aguarde a aprovação do dono.', true);
+    mostrar('Pedido enviado! Aguarde a aprovaÃ§Ã£o do dono.', true);
   } catch (err) { mostrar(err.message); }
   finally { $('btn').disabled = false; $('btn').textContent = 'Pedir acesso'; }
 });
@@ -1713,7 +1827,7 @@ $('f').addEventListener('submit', async (e) => {
 PAGINA_APROVACOES = r"""<!doctype html>
 <html lang="pt-BR"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#101114"><title>EKO - aprovações</title>
+<meta name="theme-color" content="#101114"><title>EKO - aprovaÃ§Ãµes</title>
 <style>
 :root{color-scheme:dark}*{box-sizing:border-box}
 body{margin:0;background:#101114;color:#e8e8ea;padding:18px;
@@ -1732,8 +1846,8 @@ button.sec{background:#23262d;color:#c9ccd4;font-weight:500}
 .acoes button{margin:0;padding:10px;font-size:13px}
 .vazio{color:#6a6d76;font-size:13px;text-align:center;padding:24px 0}
 </style></head><body>
-<h1>Aprovações</h1>
-<div class="sub">cadastros pendentes — aprove só quem você conhece</div>
+<h1>AprovaÃ§Ãµes</h1>
+<div class="sub">cadastros pendentes â€” aprove sÃ³ quem vocÃª conhece</div>
 <input id="tok" type="password" placeholder="senha do dono">
 <button id="conectar" class="sec">Conectar</button>
 <div id="lista"><div class="vazio">Informe a senha do dono.</div></div>
@@ -1750,13 +1864,13 @@ $('conectar').onclick = () => {
 async function carregar() {
   try {
     const r = await fetch('/api/cadastros', {headers: {'X-Token': T}});
-    if (r.status === 401 || r.status === 403) { $('lista').innerHTML = '<div class="vazio">Senha do dono inválida.</div>'; return; }
+    if (r.status === 401 || r.status === 403) { $('lista').innerHTML = '<div class="vazio">Senha do dono invÃ¡lida.</div>'; return; }
     const j = await r.json();
     if (!j.length) { $('lista').innerHTML = '<div class="vazio">Nenhum cadastro pendente.</div>'; return; }
     $('lista').innerHTML = j.map((c) =>
       '<div class="item"><b>' + esc(c.nome) + '</b>' +
-      '<div class="meta">' + esc(c.usuario) + (c.email ? ' · ' + esc(c.email) : '') +
-      ' · ' + esc(c.criado) + '</div><div class="acoes">' +
+      '<div class="meta">' + esc(c.usuario) + (c.email ? ' Â· ' + esc(c.email) : '') +
+      ' Â· ' + esc(c.criado) + '</div><div class="acoes">' +
       '<button onclick="acao(\'' + c.id + '\',\'aprovar\')">Aprovar</button>' +
       '<button class="sec" onclick="acao(\'' + c.id + '\',\'rejeitar\')">Rejeitar</button>' +
       '</div></div>').join('');
@@ -1847,6 +1961,26 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             with caminho.open("rb") as f:
                 shutil.copyfileobj(f, self.wfile, 1024 * 256)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+
+    def _enviar_noticia_audio(self, ident):
+        if not ident:
+            return self._json(404, {"erro": "audio nao encontrado"})
+        caminho = _noticia_audio(ident)
+        if not caminho:
+            return self._json(404, {"erro": "audio indisponivel"})
+        try:
+            dados = caminho.read_bytes()
+        except OSError:
+            return self._json(404, {"erro": "audio indisponivel"})
+        try:
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/mpeg")
+            self.send_header("Content-Length", str(len(dados)))
+            self.send_header("Cache-Control", "public, max-age=86400")
+            self.end_headers()
+            self.wfile.write(dados)
         except (BrokenPipeError, ConnectionResetError):
             pass
 
@@ -2153,9 +2287,29 @@ class Handler(BaseHTTPRequestHandler):
             if not dono_ok(self, query):
                 return self._json(403, {"erro": "so o dono"})
             return self._json(200, cadastros_publicos())
+        if rota == "/api/baixadas":
+            usuario = (query.get("usuario") or [""])[0]
+            nome = nome_por_usuario(usuario)
+            if not nome:
+                return self._json(404, {"erro": "usuario sem playlist"})
+            return self._json(200, {
+                "usuario": usuario,
+                "nome": nome,
+                "playlist": f"Baixadas - {nome}",
+            })
         if not token_ok(self, query):
             _falhou_auth(ip)
             return self._json(401, {"erro": "senha invalida"})
+        if rota == "/api/baixadas":
+            usuario = (query.get("usuario") or [""])[0]
+            nome = nome_por_usuario(usuario)
+            if not nome:
+                return self._json(404, {"erro": "usuario sem playlist"})
+            return self._json(200, {
+                "usuario": usuario,
+                "nome": nome,
+                "playlist": f"Baixadas - {nome}",
+            })
         if rota == "/api/quem":
             enviado = token_enviado(self, query)
             dev = dispositivo_por_token(enviado) or {}
@@ -2268,6 +2422,16 @@ class Handler(BaseHTTPRequestHandler):
             return self._nd_stream((query.get("id") or [""])[0])
         if rota == "/api/nd/capa":
             return self._nd_capa((query.get("id") or [""])[0])
+        if rota == "/api/noticias":
+            if not token_ok(self, query):
+                return self._json(401, {"erro": "senha invalida"})
+            categoria = (query.get("categoria") or query.get("cat") or ["tecnologia"])[0]
+            cidade = (query.get("cidade") or CFG.get("cidade_noticias") or ["Jundiai"])[0]
+            return self._json(200, _noticias_lista(categoria, cidade))
+        if rota == "/api/noticia_audio":
+            if not token_ok(self, query):
+                return self._json(401, {"erro": "senha invalida"})
+            return self._enviar_noticia_audio((query.get("i") or [""])[0])
         if rota == "/api/arquivo":
             jid = (query.get("job") or [""])[0]
             job = next((j for j in novidades() if j["id"] == jid), None)
@@ -2699,3 +2863,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

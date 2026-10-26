@@ -16,8 +16,8 @@ android {
         applicationId = "eco.c.player"
         minSdk = 26
         targetSdk = 35
-        versionCode = 34
-        versionName = "1.2.5"
+        versionCode = 41
+        versionName = "1.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -161,6 +161,12 @@ dependencies {
     // Unit tests (JVM) ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â queue transform logic
     testImplementation(libs.junit)
 }
+
+
+
+
+
+
 
 
 
